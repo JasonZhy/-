@@ -1,0 +1,1021 @@
+//（一）智能小车全速前进控制程序如下：
+#define EN1 PAout(2)              //电机驱动芯片L293D控制管脚EN1接PA2
+#define IN1 PAout(3)              //电机驱动芯片L293D控制管脚IN1接PA3
+#define IN2 PAout(4)              //电机驱动芯片L293D控制管脚IN2接PA4
+#define EN2 PAout(7)              //电机驱动芯片L293D控制管脚EN2接PA5
+#define IN3 PAout(6)              //电机驱动芯片L293D控制管脚EN3接PA6
+#define IN4 PAout(5)              //电机驱动芯片L293D控制管脚EN4接PA7
+void Motor_Init(void)
+{
+ RCC->APB2ENR|=1<<2;             //使能PORTA接口时钟 
+ GPIOA->CRL&=0XFFFFF0FF;
+ GPIOA->CRL|=0X00000300;         //PA2推挽输出
+ GPIOA->ODR|=1<<2;               //PA2输出高电平
+ GPIOA->CRL&=0XFFFF0FFF;
+ GPIOA->CRL|=0X00003000;         //PA3推挽输出
+ GPIOA->ODR|=1<<3;               //PA3输出高电平
+ GPIOA->CRL&=0XFFF0FFFF;
+ GPIOA->CRL|=0X00030000;         //PA4推挽输出
+ GPIOA->ODR|=1<<4;               //PA4输出高电平
+ GPIOA->CRL&=0XFF0FFFFF;
+ GPIOA->CRL|=0X00300000;         //PA5推挽输出
+ GPIOA->ODR|=1<<5;               //PA5输出高电平
+ GPIOA->CRL&=0XF0FFFFFF;
+ GPIOA->CRL|=0X03000000;         //PA6推挽输出
+ GPIOA->ODR|=1<<6;               //PA6输出高电平	
+ GPIOA->CRL&=0X0FFFFFFF;
+ GPIOA->CRL|=0X30000000;         //PA7推挽输出
+ GPIOA->ODR|=1<<7;               //PA7输出高电平
+}
+void Full_Speed_Forward(void)
+{
+ EN1 = 1;IN1 = 1;IN2 = 0;	
+ EN2 = 1;IN3 = 1;IN4 = 0;
+}
+int main(void)
+{		 			  
+ Stm32_Clock_Init(9);              //系统时钟设置
+ delay_init(72);	               //延时初始化
+ Motor_Init();		  	           //初始化与LED连接的硬件接口
+ Full_Speed_Forward();             //智能小车全速前进
+ while(1)
+ { ; }	 
+}
+
+//（二）附录二：智能小车PWM调速前进程序如下：
+
+int main(void)
+{		 			  
+ Stm32_Clock_Init(9);                   //系统时钟设置
+ delay_init(72);	                    //延时初始化
+ Motor_Init();		  	                //初始化与电机连接的硬件接口
+ Timerx_Init(9,7199);                   //10Khz的计数频率，计数到9为1ms 
+ forward();                             //小车前进控制函数	
+ while(1)
+ {;}	 
+}
+void Motor_Init(void)
+{
+ RCC->APB2ENR|=1<<2;                    //使能PORTA接口时钟
+ GPIOA->CRL&=0XFFFFF0FF;
+ GPIOA->CRL|=0X00000300;                //PA2推挽输出
+ GPIOA->ODR|=1<<2;                      //PA2输出高电平	
+ GPIOA->CRL&=0XFFFF0FFF;
+ GPIOA->CRL|=0X00003000;                //PA3推挽输出
+ GPIOA->ODR|=1<<3;                      //PA3输出高电平	
+ GPIOA->CRL&=0XFFF0FFFF;
+ GPIOA->CRL|=0X00030000;                //PA4推挽输出
+ GPIOA->ODR|=1<<4;                      //PA4输出高电平
+ GPIOA->CRL&=0XFF0FFFFF;
+ GPIOA->CRL|=0X00300000;                //PA5推挽输出
+ GPIOA->ODR|=1<<5;                      //PA5输出高电平
+ GPIOA->CRL&=0XF0FFFFFF;
+ GPIOA->CRL|=0X03000000;                //PA6推挽输出
+ GPIOA->ODR|=1<<6;                      //PA6输出高电平	
+ GPIOA->CRL&=0X0FFFFFFF;
+ GPIOA->CRL|=0X30000000;                //PA7推挽输出
+ GPIOA->ODR|=1<<7;                      //PA7输出高电平
+}
+void forward(void)                      //小车前进控制函数
+{
+ IN1 = 1;IN2 = 0;IN3 = 1;IN4 = 0;  
+}
+void left_moto(void)                        //左电机调速函数
+{  
+ if(left_pwm)
+ {
+  if(pwmval_left <= pwmval_left_init)
+  {EN1 = 1;}
+  else 
+  {EN1 = 0;}
+  if(pwmval_left >= 20)
+  {pwmval_left = 0;}
+ }
+ else    
+ {EN1 = 0;}
+}
+void right_moto(void)                        //右电机调速函数
+{ 
+ if(right_pwm)
+ { 
+  if(pwmval_right <= pwmval_right_init)		  
+  {EN2 = 1;}
+  else if(pwmval_right > pwmval_right_init)
+  {EN2 = 0;}
+  if(pwmval_right >= 20)
+  {pwmval_right = 0;}
+ }
+ else    
+ {EN2 = 0;}
+}
+void TIM3_IRQHandler(void)
+{ 		    		  			    
+ if(TIM3->SR&0X0001)                          //溢出中断
+ {
+  pwmval_left  = pwmval_left  + 1;
+  pwmval_right = pwmval_right + 1;
+  left_moto();
+  right_moto(); 
+ }				   
+ TIM3->SR&=~(1<<0);                         //清除中断标志位 	    
+}
+void Timerx_Init(u16 arr,u16 psc)
+{
+ RCC->APB1ENR|=1<<1;                        //TIM3时钟使能    
+ TIM3->ARR=arr;                             //设定计数器自动重装值//刚好1ms    
+ TIM3->PSC=psc;                         //预分频器7200,得到10Khz的计数时钟
+ //这两个东东要同时设置才可以使用中断
+ TIM3->DIER|=1<<0;                          //允许更新中断				  
+ TIM3->CR1|=0x01;                           //使能定时器3
+ MY_NVIC_Init(1,3,TIM3_IRQChannel,2);       //抢占1，子优先级3，组2		
+}  
+//（三）附录三： 智能小车红外避障程序如下：
+
+#include "sys.h"	
+#include "delay.h"	
+#define EN1 PAout(2)                          //L293D控制管脚定义
+#define IN1 PAout(3)                          //L293D控制管脚定义
+#define IN2 PAout(4)                          //L293D控制管脚定义
+#define EN2 PAout(7)                          //L293D控制管脚定义
+#define IN3 PAout(6)                          //L293D控制管脚定义
+#define IN4 PAout(5)                          //L293D控制管脚定义
+#define BEEP PBout(5)                         //蜂鸣器控制管脚定义
+#define KEY1 PAin(8)		                  //功能按键对应的管脚
+#define BZ_LEFT PAin(13)                      //左边避障信号           
+#define BZ_RIGHT PAin(14)                     //右边避障信号
+u8 pwmval_left  = 0;                          //左电机调速变量 
+u8 pwmval_right = 0;                          //右电机调速变量 
+u8 pwmval_left_init  = 6;                     //左电机速度值  
+u8 pwmval_right_init = 6;                     //右电机速度值 
+u8 right_pwm = 1;	                          //左电机调速开关   
+u8 left_pwm  = 1;			                  //右电机调速开关      
+void Motor_Init(void);                        //电机接口初始化
+void forward(void);                           //小车前进控制函数
+void back(void);			                  //小车后退控制函数
+void left_turn(void);	                      //向左转
+void right_turn(void);		                  //向右转  
+void stop(void);			                  //停车
+void circle_left(void);		                  //原地向左转圈
+void circle_right(void);		 	          //原地向右转圈 
+void left_moto(void);                         //左电机调速函数
+void right_moto(void);                        //右电机调速函数
+void Timerx_Init(u16 arr,u16 psc);            //定时器初始化函数
+void Beep_Init(void);                         //蜂鸣器接口初始化
+void Key_Init(void);                          //按键接口初始化函数
+void Key_Scan(void);                          //按键1扫描函数
+void Xj_Init(void);                           //循迹信号接口初始化函数
+int main(void)
+{
+ Stm32_Clock_Init(9);                         //系统时钟设置
+ delay_init(72);	                          //延时初始化
+ Motor_Init();		  	                      //初始化与电机连接的硬件接口
+ Timerx_Init(9,7199);                         //10Khz的计数频率，计数到9为1ms 
+ Beep_Init();                                 //蜂鸣器接口初始化                                 
+ Key_Init();                                  //按键接口初始化
+ Xj_Init();                                   //避障信号接口初始化	
+ Key_Scan();                                  //按键扫描	
+ while(1)        	                               
+ {   
+  if((BZ_LEFT==1)&&(BZ_RIGHT==1))             //两边都没有感应到障碍物
+  {forward();}                                //前进 		  
+  if((BZ_LEFT==1)&&(BZ_RIGHT==0))	          //右边感应到障碍物
+  {
+   delay_ms(3);
+if((BZ_LEFT==1)&&(BZ_RIGHT == 0))
+{left_turn();}		                      //左转		 	 
+  }			   			    
+  if((BZ_RIGHT==1)&&(BZ_LEFT==0))             //左边感应到障碍物
+  {
+   delay_ms(3);
+   if((BZ_RIGHT==1)&&(BZ_LEFT==0))              
+   {right_turn();}		                      //右转	    
+  }	 
+ }	 
+}
+void Beep_Init(void)               //蜂鸣器接口初始化
+{
+ RCC->APB2ENR|=1<<3;               //使能PORTB时钟
+ GPIOB->CRL&=0XFF0FFFFF;
+ GPIOB->CRL|=0X00300000;           //PB5推挽输出
+ GPIOB->ODR|=1<<5;                 //PB5输出高	
+}
+void Xj_Init(void)
+{
+ RCC->APB2ENR|=1<<2;               //使能PORTA时钟	   	 
+ GPIOA->CRH&=0XFF0FFFFF; 
+ GPIOA->CRH|=0X00800000;           //PA13上拉输入
+ GPIOA->ODR|=1<<13;                //PA13上拉	
+ GPIOA->CRH&=0XF0FFFFFF; 
+ GPIOA->CRH|=0X08000000;           //PA14上拉输入
+ GPIOA->ODR|=1<<14;                //PA14上拉	
+}
+void Key_Init(void)
+{
+ RCC->APB2ENR|=1<<2;               //使能PORTA时钟	   	 
+ GPIOA->CRH&=0XFFFFFFF0; 
+ GPIOA->CRH|=0X00000008;           //PA8上拉输入
+ GPIOA->ODR|=1<<8;                 //PA8上拉	
+}
+void Key_Scan(void)                //按键扫描函数
+{
+ LOOP:if(KEY1==0)                  //第一次判断按键是否被按下
+      {
+       delay_ms(5);
+	   if(KEY1==0)                 //第二次判断按键是否被按下
+       {
+		BEEP = 0;		           //蜂鸣器响  
+		while(KEY1 == 0);          //等待按键松开  
+		BEEP = 1;	               //蜂鸣器不响
+       }
+	   else
+	   {goto LOOP;}                //第一次判断时按键没有被按下重新扫描  
+      }
+      else
+      {goto LOOP;}                 //第二次判断时按键没有被按下重新扫描      
+}
+void Motor_Init(void)
+{
+ RCC->APB2ENR|=1<<2;                    //使能PORTA接口时钟  
+ GPIOA->CRL&=0XFFFFF0FF;
+ GPIOA->CRL|=0X00000300;                //PA2推挽输出
+ GPIOA->ODR|=1<<2;                      //PA2输出高电平	
+ GPIOA->CRL&=0XFFFF0FFF;
+ GPIOA->CRL|=0X00003000;                //PA3推挽输出
+ GPIOA->ODR|=1<<3;                      //PA3输出高电平	
+ GPIOA->CRL&=0XFFF0FFFF;
+ GPIOA->CRL|=0X00030000;                //PA4推挽输出
+ GPIOA->ODR|=1<<4;                      //PA4输出高电平
+ GPIOA->CRL&=0XFF0FFFFF;
+ GPIOA->CRL|=0X00300000;                //PA5推挽输出
+ GPIOA->ODR|=1<<5;                      //PA5输出高电平	
+ GPIOA->CRL&=0XF0FFFFFF;
+ GPIOA->CRL|=0X03000000;                //PA6推挽输出
+ GPIOA->ODR|=1<<6;                      //PA6输出高电平	
+ GPIOA->CRL&=0X0FFFFFFF;
+ GPIOA->CRL|=0X30000000;                //PA7推挽输出
+ GPIOA->ODR|=1<<7;                      //PA7输出高电平
+}
+void forward(void)                      //小车前进控制函数
+{IN1 = 1;IN2 = 0;IN3 = 1;IN4 = 0;}
+void back(void)			                //小车后退控制函数
+{IN1 = 0;IN2 = 1;IN3 = 0;IN4 = 1;}
+void left_turn(void)	                //向左转
+{IN1 = 1;IN2 = 0;IN3 = 0;IN4 = 0;}
+void right_turn(void)		            //向右转  
+{IN1 = 0;IN2 = 0;IN3 = 1;IN4 = 0;}
+void stop(void)			                //停车
+{IN1 = 0;IN2 = 0;IN3 = 0;IN4 = 0;}
+void circle_left(void)		            //原地向左转圈
+{IN1 = 1;IN2 = 0;IN3 = 0;IN4 = 1;}
+void circle_right(void)		 	        //原地向右转圈 
+{IN1 = 0;IN2 = 1;IN3 = 1;IN4 = 0;}
+void left_moto(void)                    //左电机调速函数
+{  
+ if(left_pwm)
+ {
+  if(pwmval_left <= pwmval_left_init)
+  {EN1 = 1;}
+  else 
+  {EN1 = 0;}
+  if(pwmval_left >= 20)
+  {pwmval_left = 0;}
+ }
+ else    
+ {EN1 = 0;}
+}
+void right_moto(void)                   //右电机调速函数
+{ 
+ if(right_pwm)
+ { 
+  if(pwmval_right <= pwmval_right_init)		  
+  {EN2 = 1;}
+  else if(pwmval_right > pwmval_right_init)
+  {EN2 = 0;}
+  if(pwmval_right >= 20)
+  {pwmval_right = 0;}
+ }
+ else    
+ {EN2 = 0;}
+}
+void TIM3_IRQHandler(void)
+{ 		    		  			    
+ if(TIM3->SR&0X0001)                          //溢出中断
+ {
+  pwmval_left  = pwmval_left  + 1;
+  pwmval_right = pwmval_right + 1;
+  left_moto();
+  right_moto(); 
+ }				   
+ TIM3->SR&=~(1<<0);                           //清除中断标志位 	    
+}
+void Timerx_Init(u16 arr,u16 psc)
+{
+ RCC->APB1ENR|=1<<1;                    //TIM3时钟使能    
+ TIM3->ARR=arr;                         //设定计数器自动重装值//刚好1ms    
+ TIM3->PSC=psc;                         //预分频器7200,得到10Khz的计数时钟
+ //这两个东东要同时设置才可以使用中断
+ TIM3->DIER|=1<<0;                      //允许更新中断				  
+ TIM3->CR1|=0x01;                       //使能定时器3
+ MY_NVIC_Init(1,3,TIM3_IRQChannel,2);   //抢占1，子优先级3，组2			
+}
+在while(1)循环中，
+if((BZ_LEFT==1)&&(BZ_RIGHT==1))             //两边都没有感应到障碍物
+{forward();}                                //前进 		  
+if((BZ_LEFT==1)&&(BZ_RIGHT==0))	            //右边感应到障碍物
+{
+ delay_ms(3);
+if((BZ_LEFT==1)&&(BZ_RIGHT == 0))
+{left_turn();}		                        //左转		 	 
+}			   			    
+if((BZ_RIGHT==1)&&(BZ_LEFT==0))             //左边感应到障碍物
+{
+ delay_ms(3);
+ if((BZ_RIGHT==1)&&(BZ_LEFT==0))              
+ {right_turn();}		                    //右转	    
+}
+//（四）附录四：智能小车超声波避障程序如下：
+#include "sys.h"	
+#include "delay.h"	
+#define EN1 PAout(2)                          //L293D控制管脚定义
+#define IN1 PAout(3)                          //L293D控制管脚定义
+#define IN2 PAout(4)                          //L293D控制管脚定义
+#define EN2 PAout(7)                          //L293D控制管脚定义
+#define IN3 PAout(6)                          //L293D控制管脚定义
+#define IN4 PAout(5)                          //L293D控制管脚定义
+#define BEEP PBout(5)                         //蜂鸣器控制管脚定义
+#define KEY1 PAin(8)		                  //功能按键对应的管脚
+#define BZ_LEFT PAin(13)                      //左边避障信号           
+#define BZ_RIGHT PAin(14)                     //右边避障信号
+#define ControlPort PAout(0)                  //舵机控制接口
+#define Stop  0                               //舵机停标志
+#define Right 1	                              //舵机右转标志
+#define Left  2	                              //舵机左转标志
+#define OLED_RST_Clr() PCout(13)=0            //RST
+#define OLED_RST_Set() PCout(13)=1            //RST
+#define OLED_RS_Clr() PBout(4)=0              //DC
+#define OLED_RS_Set() PBout(4)=1              //DC
+#define OLED_SCLK_Clr() PCout(15)=0           //SCL
+#define OLED_SCLK_Set() PCout(15)=1           //SCL
+#define OLED_SDIN_Clr() PCout(14)=0           //SDA
+#define OLED_SDIN_Set() PCout(14)=1           //SDA
+#define OLED_CMD  0	                          //写命令
+#define OLED_DATA 1	                          //写数据
+u32 JuLi;                                     //超声波测距
+u8 pwmval_left  = 0;                          //左电机调速变量 
+u8 pwmval_right = 0;                          //右电机调速变量 
+u8 pwmval_left_init  = 6;                     //左电机速度值  
+u8 pwmval_right_init = 6;                     //右电机速度值 
+u8 right_pwm = 1;	                          //左电机调速开关   
+u8 left_pwm  = 1;			                  //右电机调速开关      
+u8 TimeOutCounter = 0;
+u8 LeftOrRight    = 0;
+u16 timer = 0;   
+u8 hw_flag;
+u32 S_temp;
+u8 OLED_GRAM[128][8];
+const unsigned char oled_asc2_1206[95][12];
+const unsigned char oled_asc2_1608[95][16];
+void Motor_Init(void);                        //电机接口初始化
+void forward(void);                           //小车前进控制函数
+void back(void);			                  //小车后退控制函数
+void left_turn(void);	                      //向左转
+void right_turn(void);		                  //向右转  
+void stop(void);			                  //停车
+void circle_left(void);		                  //原地向左转圈
+void circle_right(void);		 	          //原地向右转圈 
+void left_moto(void);                         //左电机调速函数
+void right_moto(void);                        //右电机调速函数
+void Timer1_Init(u16 arr,u16 psc);            //定时器1初始化函数
+void Timer2_Init(u16 arr,u16 psc);            //定时器2初始化函数
+void Timer3_Init(u16 arr,u16 psc);            //定时器3初始化函数
+void Beep_Init(void);                         //蜂鸣器接口初始化
+void Key_Init(void);                          //按键接口初始化函数
+void Key_Scan(void);                          //按键1扫描函数
+void Bz_Init(void);                           //红外避障信号接口初始化函数
+void OLED_WR_Byte(u8 dat,u8 cmd);	    
+void OLED_Display_On(void);
+void OLED_Display_Off(void);
+void OLED_Refresh_Gram(void);		   				   		    
+void Oled_Init(void);
+void OLED_Clear(void);
+void OLED_DrawPoint(u8 x,u8 y,u8 t);
+void OLED_ShowChar(u8 x,u8 y,u8 chr,u8 size,u8 mode);
+void OLED_ShowNumber(u8 x,u8 y,u32 num,u8 len,u8 size);
+void OLED_ShowString(u8 x,u8 y,const u8 *p);	
+void Oled_Show(void);
+void Dj_Init(void);
+void ControlLeftOrRight(void);
+void Hw_bz(void);
+void process(void);
+int main(void)
+{
+ u8 k;	
+ Stm32_Clock_Init(9);                         //系统时钟设置
+ delay_init(72);	                          //延时初始化
+ JTAG_Set(JTAG_SWD_DISABLE);                  //关闭JTAG接口
+ JTAG_Set(SWD_ENABLE);                        //打开SWD接口
+ Oled_Init();                                 //OLED初始化  
+ Timer3_Init(0XFFFF,72-1);	                  //超声波初始化
+ Timer1_Init(499,7199);
+ Motor_Init();		  	                   //初始化与电机连接的硬件接口
+ Timer2_Init(25,719);                   //10Khz的计数频率，计数到9为1ms
+ Beep_Init();                                 //蜂鸣器接口初始化                                 
+ Key_Init();                                  //按键接口初始化
+ Bz_Init();                                   //红外避障信号接口初始化
+ Dj_Init();                                   //舵机控制接口初始化	
+ ControlLeftOrRight();                        //舵机初始化
+ Key_Scan();                                  //按键扫描	
+ while(1)        	                               
+ { 
+  if(timer>=400)
+  {
+   timer = 0;
+   Oled_Show();                               //oled显示提示信息
+   S_temp = JuLi;                             //超声波模块测到的距离值
+   Hw_bz();                                   //红外避障
+   if((S_temp>=250)&&(hw_flag == 0))		      
+//如果不满足避障条件（超声波模块测到前方障碍物距离大于25厘米或红外避障感应到前方有障碍物）     
+   {
+	BEEP = 1;
+	forward();                                //智能小车继续前进
+   }
+   else                                       //如果满足避障条件    
+   {	   
+	BEEP = 0;                                 //蜂鸣器响
+	stop();                                   //智能小车停下
+	for(k=0;k<=8;k++)
+    {delay_ms(1000);}
+	BEEP = 1;                                 //蜂鸣器不响
+	process();                                //避障处理
+   }
+  }  
+  Oled_Show();                                //OLED显示信息
+ }	 
+}
+void Dj_Init(void)                            //舵机控制接口初始化函数
+{
+ RCC->APB2ENR|=1<<2;                          //使能PORTA口时钟 
+ GPIOA->CRL&=0XFFFFFFF0;                      //PORTA.0 推挽输出
+ GPIOA->CRL|=0X00000003;
+ GPIOA->ODR|=1<<0;                            //输出1
+} 
+void ControlLeftOrRight(void)                 //舵机自检函数
+{
+ u8 i; 
+ LeftOrRight    = Stop;                       //舵机停在中间
+ TimeOutCounter = 0;
+ for(i=0;i<=9;i++)
+ {delay_ms(1000);}
+ LeftOrRight = Left;                          //舵机左边
+ TimeOutCounter = 0;
+ for(i=0;i<=9;i++)
+ {delay_ms(1000);}
+ LeftOrRight = Right;                         //舵机右边
+ TimeOutCounter = 0;
+ for(i=0;i<=13;i++)
+ {delay_ms(1000);} 
+ LeftOrRight = Stop;                          //舵机停在中间
+ TimeOutCounter = 0;
+ for(i=0;i<=9;i++)
+ {delay_ms(1000);}
+}
+void Hw_bz(void)                              //红外避障函数
+{
+ if((BZ_LEFT == 0)||(BZ_RIGHT == 0))	        
+//如果左右两边任何一个红外避障模块感应到障碍物    	   
+ {hw_flag = 1;}		                          //设置红外避障标志 
+ else 
+ {hw_flag = 0;}                               //屏蔽红外避障标志			   
+}
+void Beep_Init(void)                          //蜂鸣器接口初始化
+{
+ RCC->APB2ENR|=1<<3;                          //使能PORTB时钟  
+ GPIOB->CRL&=0XFF0FFFFF;
+ GPIOB->CRL|=0X00300000;                      //PB5推挽输出
+ GPIOB->ODR|=1<<5;                            //PB5输出高	
+}
+void Bz_Init(void)
+{
+ RCC->APB2ENR|=1<<2;                          //使能PORTA时钟	   	 
+ GPIOA->CRH&=0XFF0FFFFF; 
+ GPIOA->CRH|=0X00800000;                      //PA13上拉输入
+ GPIOA->ODR|=1<<13;                           //PA13上拉	
+ GPIOA->CRH&=0XF0FFFFFF; 
+ GPIOA->CRH|=0X08000000;                      //PA14上拉输入
+ GPIOA->ODR|=1<<14;                           //PA14上拉	
+}
+void Key_Init(void)
+{
+ RCC->APB2ENR|=1<<2;                          //使能PORTA时钟	   	 
+ GPIOA->CRH&=0XFFFFFFF0; 
+ GPIOA->CRH|=0X00000008;                      //PA8上拉输入
+ GPIOA->ODR|=1<<8;                            //PA8上拉	
+} 
+void Key_Scan(void)                           //按键扫描函数
+{
+ LOOP:if(KEY1==0)  		                      //第一次判断是否有按键按下
+      {
+       delay_ms(5);
+	   if(KEY1==0)  		                  //第二次判断是否有按键按下
+       {
+		BEEP = 0;		                      //蜂鸣器响
+		while(KEY1 == 0);                     //等待按键松开
+		BEEP = 1;	                          //蜂鸣器不响
+       }
+	   else
+	   {
+	    goto LOOP;                            
+//第一次判断时如果按键没有按下重新扫描
+	   }
+      }
+      else
+      { 
+       goto LOOP;	                            
+//第二次判断时如果按键没有按下重新扫描
+      }
+}
+void Motor_Init(void)
+{
+ RCC->APB2ENR|=1<<2;                    //使能PORTA接口时钟  
+ GPIOA->CRL&=0XFFFFF0FF;
+ GPIOA->CRL|=0X00000300;                //PA2推挽输出
+ GPIOA->ODR|=1<<2;                      //PA2输出高电平
+ GPIOA->CRL&=0XFFFF0FFF;
+ GPIOA->CRL|=0X00003000;                //PA3推挽输出
+ GPIOA->ODR|=1<<3;                      //PA3输出高电平	
+ GPIOA->CRL&=0XFFF0FFFF;
+ GPIOA->CRL|=0X00030000;                //PA4推挽输出
+ GPIOA->ODR|=1<<4;                      //PA4输出高电平
+ GPIOA->CRL&=0XFF0FFFFF;
+ GPIOA->CRL|=0X00300000;                //PA5推挽输出
+ GPIOA->ODR|=1<<5;                      //PA5输出高电平
+ GPIOA->CRL&=0XF0FFFFFF;
+ GPIOA->CRL|=0X03000000;                //PA6推挽输出
+ GPIOA->ODR|=1<<6;                      //PA6输出高电平	
+ GPIOA->CRL&=0X0FFFFFFF;
+ GPIOA->CRL|=0X30000000;                //PA7推挽输出
+ GPIOA->ODR|=1<<7;                      //PA7输出高电平
+}
+void forward(void)                      //小车前进控制函数
+{IN1 = 1;IN2 = 0;IN3 = 1;IN4 = 0;}
+void back(void)			                //小车后退控制函数
+{IN1 = 0;IN2 = 1;IN3 = 0;IN4 = 1;}
+void left_turn(void)	                //向左转
+{IN1 = 1;IN2 = 0;IN3 = 0;IN4 = 0;}
+void right_turn(void)		            //向右转  
+{IN1 = 0;IN2 = 0;IN3 = 1;IN4 = 0;}
+void stop(void)			                //停车
+{IN1 = 0;IN2 = 0;IN3 = 0;IN4 = 0;}
+void circle_left(void)		            //原地向左转圈
+{IN1 = 1;IN2 = 0;IN3 = 0;IN4 = 1;}
+void circle_right(void)		 	        //原地向右转圈 
+{IN1 = 0;IN2 = 1;IN3 = 1;IN4 = 0;}
+void left_moto(void)                    //左电机调速函数
+{  
+ if(left_pwm)
+ {
+  if(pwmval_left <= pwmval_left_init)
+  {EN1 = 1;}
+  else 
+  {EN1 = 0;}
+  if(pwmval_left >= 20)
+  {pwmval_left = 0;}
+ }
+ else    
+ {EN1 = 0;}
+}
+void right_moto(void)                   //右电机调速函数
+{ 
+ if(right_pwm)
+ { 
+  if(pwmval_right <= pwmval_right_init)		  
+  {EN2 = 1;}
+  else if(pwmval_right > pwmval_right_init)
+  {EN2 = 0;}
+  if(pwmval_right >= 20)
+  {pwmval_right = 0;}
+ }
+ else    
+ {EN2 = 0;}
+}
+void OLED_Refresh_Gram(void)
+{
+ u8 i,n;		    
+ for(i=0;i<8;i++)  
+ {  
+  OLED_WR_Byte (0xb0+i,OLED_CMD);       //设置页地址（0~7）
+  OLED_WR_Byte (0x00,OLED_CMD);         //设置显示位置—列低地址
+  OLED_WR_Byte (0x10,OLED_CMD);         //设置显示位置—列高地址   
+  for(n=0;n<128;n++)
+  {OLED_WR_Byte(OLED_GRAM[n][i],OLED_DATA);}
+ }   
+}
+void OLED_WR_Byte(u8 dat,u8 cmd)
+{	
+ u8 i;			  
+ if(cmd)
+ {OLED_RS_Set();}
+ else 
+ {OLED_RS_Clr();}		  
+ for(i=0;i<8;i++)
+ {			  
+  OLED_SCLK_Clr();
+  if(dat&0x80)
+  {OLED_SDIN_Set();}
+  else
+  {OLED_SDIN_Clr();}
+  OLED_SCLK_Set();
+  dat<<=1;   
+ }				 		  
+ OLED_RS_Set();   	  
+}
+void OLED_Display_On(void)
+{
+ OLED_WR_Byte(0X8D,OLED_CMD);            //SET DCDC命令
+ OLED_WR_Byte(0X14,OLED_CMD);            //DCDC ON
+ OLED_WR_Byte(0XAF,OLED_CMD);            //DISPLAY ON
+}
+void OLED_Display_Off(void)
+{
+ OLED_WR_Byte(0X8D,OLED_CMD);            //SET DCDC命令
+ OLED_WR_Byte(0X10,OLED_CMD);            //DCDC OFF
+ OLED_WR_Byte(0XAE,OLED_CMD);            //DISPLAY OFF
+}
+void OLED_Clear(void)  
+{  
+ u8 i,n;  
+ for(i=0;i<8;i++)for(n=0;n<128;n++)OLED_GRAM[n][i]=0X00;  
+ OLED_Refresh_Gram();                    //更新显示
+}
+void OLED_DrawPoint(u8 x,u8 y,u8 t)
+{
+ u8 pos,bx,temp=0;
+ if(x>127||y>63)return;                  //超出范围了.
+ pos=7-y/8;
+ bx=y%8;
+ temp=1<<(7-bx);
+ if(t)OLED_GRAM[x][pos]|=temp;
+ else OLED_GRAM[x][pos]&=~temp;	    
+}
+void OLED_ShowChar(u8 x,u8 y,u8 chr,u8 size,u8 mode)
+{      			    
+ u8 temp,t,t1;
+ u8 y0=y;
+ chr=chr-' ';                             //得到偏移后的值				   
+ for(t=0;t<size;t++)
+ {   
+  if(size==12)			                  //调用1206字体
+  {temp=oled_asc2_1206[chr][t];}
+  else 							          //调用1608字体
+  {temp=oled_asc2_1608[chr][t];}	                          
+  for(t1=0;t1<8;t1++)
+  {
+   if(temp&0x80)
+   {OLED_DrawPoint(x,y,mode);}
+   else
+   {OLED_DrawPoint(x,y,!mode);}
+   temp<<=1;
+   y++;
+   if((y-y0)==size)
+   {y=y0;x++;break;}
+  }  	 
+ }          
+}
+u32 oled_pow(u8 m,u8 n)
+{
+ u32 result=1;	 
+ while(n--)result*=m;    
+ return result;
+}
+void OLED_ShowNumber(u8 x,u8 y,u32 num,u8 len,u8 size)
+{         	
+ u8 t,temp;
+ u8 enshow=0;						   
+ for(t=0;t<len;t++)
+ {
+  temp=(num/oled_pow(10,len-t-1))%10;
+  if(enshow==0&&t<(len-1))
+  {
+   if(temp==0)
+   {OLED_ShowChar(x+(size/2)*t,y,' ',size,1);continue;}
+   else
+   {enshow=1;} 		 	 
+  }
+  OLED_ShowChar(x+(size/2)*t,y,temp+'0',size,1); 
+ }
+}
+void OLED_ShowString(u8 x,u8 y,const u8 *p)
+{
+ #define MAX_CHAR_POSX 122
+ #define MAX_CHAR_POSY 58          
+ while(*p!='\0')
+ {       
+  if(x>MAX_CHAR_POSX){x=0;y+=16;}
+  if(y>MAX_CHAR_POSY){y=x=0;OLED_Clear();}
+  OLED_ShowChar(x,y,*p,12,1);	 
+  x+=8;
+  p++;
+ }  
+}
+void Oled_Init(void)
+{ 	  	 
+ RCC->APB2ENR|=1<<3;                  //使能PORTB时钟	   	 
+ GPIOB->CRL&=0XFFF0FFFF; 
+ GPIOB->CRL|=0X00020000;              //PB4 推挽输出   
+ RCC->APB2ENR|=1<<4;     	            //使能PORTC时钟  
+ RCC->APB2ENR|=1<<0;     	            //使能AFIO时钟	
+ GPIOC->CRH&=0X000FFFFF;	            //PC13,14,15设置成输出 2MHz 推挽输出   
+ GPIOC->CRH|=0X22200000; 
+ PWR->CR|=1<<8;	                    //取消备份区写保护 
+ RCC->BDCR&=0xFFFFFFFE;	            //外部低俗振荡器关闭 PC14，PC15成为普通IO
+BKP->CR&=0xFFFFFFFE; 	            //侵入检测TAMPER引脚作为通用IO口使用 
+ PWR->CR&=0xFFFFFEFF;	            //备份区写保护
+ OLED_RST_Clr();
+ delay_ms(100);
+ OLED_RST_Set(); 					  
+ OLED_WR_Byte(0xAE,OLED_CMD);         //关闭显示
+ OLED_WR_Byte(0xD5,OLED_CMD);         //设置时钟分频因子,震荡频率
+ OLED_WR_Byte(80,OLED_CMD);           //[3:0],分频因子;[7:4],震荡频率
+ OLED_WR_Byte(0xA8,OLED_CMD);         //设置驱动路数
+ OLED_WR_Byte(0X3F,OLED_CMD);         //默认0X3F(1/64) 
+ OLED_WR_Byte(0xD3,OLED_CMD);         //设置显示偏移
+ OLED_WR_Byte(0X00,OLED_CMD);         //默认为0
+ OLED_WR_Byte(0x40,OLED_CMD);         //设置显示开始行 [5:0],行数.
+OLED_WR_Byte(0x8D,OLED_CMD);         //电荷泵设置
+ OLED_WR_Byte(0x14,OLED_CMD);         //bit2，开启/关闭
+ OLED_WR_Byte(0x20,OLED_CMD);         //设置内存地址模式
+ OLED_WR_Byte(0x02,OLED_CMD);         
+//[1:0],00，列地址模式;01，行地址模式;10,页地址模式;默认10;
+ OLED_WR_Byte(0xA1,OLED_CMD);         //段重定义设置,bit0:0,0->0;1,0->127;
+ OLED_WR_Byte(0xC0,OLED_CMD);         
+//设置COM扫描方向;bit3:0,普通模式;1,重定义模式 COM[N-1]->COM0;N:驱动路数
+ OLED_WR_Byte(0xDA,OLED_CMD);         //设置COM硬件引脚配置
+ OLED_WR_Byte(0x12,OLED_CMD);         //[5:4]配置		 
+ OLED_WR_Byte(0x81,OLED_CMD);         //对比度设置
+ OLED_WR_Byte(0xEF,OLED_CMD);         //1~255;默认0X7F (亮度设置,越大越亮)
+ OLED_WR_Byte(0xD9,OLED_CMD);         //设置预充电周期
+ OLED_WR_Byte(0xf1,OLED_CMD);         //[3:0],PHASE 1;[7:4],PHASE 2;
+ OLED_WR_Byte(0xDB,OLED_CMD);         //设置VCOMH 电压倍率
+ OLED_WR_Byte(0x30,OLED_CMD);         //[6:4] 
+ OLED_WR_Byte(0xA4,OLED_CMD);         
+//全局显示开启;bit0:1,开启;0,关闭;(白屏/黑屏)
+ OLED_WR_Byte(0xA6,OLED_CMD);         
+//设置显示方式;bit0:1,反相显示;0,正常显示	    						   
+ OLED_WR_Byte(0xAF,OLED_CMD);         //开启显示	 
+ OLED_Clear();
+} 
+void Oled_Show(void)
+{	
+ OLED_ShowString(20,10,"ChaoSB-TEST");                             
+ OLED_ShowString(0,30,"Distance:");
+ OLED_ShowNumber(80,30,(u16)JuLi,4,12);
+ OLED_ShowString(110,30,"mm");	
+ OLED_Refresh_Gram();	                      //刷新
+}
+void process(void)                            //避障处理函数
+{
+ u8 j;
+ u8 p;	
+ u32 S1_temp = 0;
+ u32 S2_temp = 0; 	 
+ LeftOrRight    = Left;                       //舵机转到左边
+ TimeOutCounter = 0;
+ for(j=0;j<=9;j++)
+ {delay_ms(1000);}
+ Oled_Show();                                 //显示障碍物距离信息
+ S1_temp = JuLi;                              
+//小车左边障碍物距离存在变量S1_temp中 
+ LeftOrRight    = Right;                      //舵机转到右边
+ TimeOutCounter = 0;
+ for(j=0;j<=13;j++)
+ {delay_ms(1000);} 
+ Oled_Show();                                 //显示障碍物距离信息
+ S2_temp = JuLi; 	                            
+//小车右边障碍物距离存在变量S2_temp中	
+ LeftOrRight    = Stop;                       //舵机回到中间
+ TimeOutCounter = 0;
+ for(j=0;j<=9;j++)
+ {delay_ms(1000);}
+ if((S1_temp<=200)||(S2_temp<=200))           
+//如果超声波模块测得左边或右边障碍物的距离小于20厘米
+ {
+  back();		                              //小车后退
+  for(p=0;p<=10;p++)
+  {delay_ms(1000);}
+ }
+ else
+ {
+  back();		                                  //小车后退
+  for(p=0;p<=8;p++)
+  {delay_ms(1000);}   
+ }
+ stop();                                      //小车停下
+ for(p=0;p<=2;p++)
+ {delay_ms(1000);}  		   
+ if(S1_temp>S2_temp)		                  //如果左边障碍物离小车远
+ {
+  circle_left(); 	                          //小车向左转
+  for(p=0;p<=2;p++)
+  {delay_ms(1000);}
+ }				      
+ else if(S1_temp<S2_temp)                     //如果右边障碍物离小车远
+ {
+  circle_right();		                      //小车向右转
+  for(p=0;p<=2;p++)
+  {delay_ms(1000);}
+ }
+}
+void Timer3_Init(u16 arr,u16 psc)	
+{	 
+ RCC->APB1ENR|=1<<1;           //TIM3时钟使能     
+ RCC->APB2ENR|=1<<3;    	   //使能PORTB时钟   	 
+ GPIOB->CRL&=0XFFFFFF00; 
+ GPIOB->CRL|=0X00000028;       //PB.0 输入 PB.1输出	
+ TIM3->ARR=arr;  		       //设定计数器自动重装值   
+ TIM3->PSC=psc;  		       //预分频器 
+ TIM3->CCMR2|=1<<0;	           //选择输入端 
+ TIM3->CCMR2|=0<<4; 	       //配置输入滤波器 不滤波
+ TIM3->CCMR2|=0<<2; 	       //配置输入分频,不分频 
+ TIM3->CCER|=0<<9; 	           //上升沿捕获
+ TIM3->CCER|=1<<8; 	           //允许捕获计数器的值到捕获寄存器中
+ TIM3->DIER|=1<<3;             //允许捕获中断				
+ TIM3->DIER|=1<<0;             //允许更新中断	
+ TIM3->CR1|=0x01;              //使能定时器3
+ MY_NVIC_Init(1,3,TIM3_IRQChannel,1);
+}
+u16 TIM3CH3_CAPTURE_STA,TIM3CH3_CAPTURE_VAL;
+void Read_Distane(void)
+{   
+ PBout(1)=1;
+ delay_us(15); 
+ PBout(1)=0;	
+ if(TIM3CH3_CAPTURE_STA&0X80)               //成功捕获到了一次高电平
+ {
+  JuLi=TIM3CH3_CAPTURE_STA&0X3F;
+  JuLi*=65536;					             //溢出时间总和
+  JuLi+=TIM3CH3_CAPTURE_VAL;		         //得到总的高电平时间
+  JuLi=JuLi*170/1000;
+  TIM3CH3_CAPTURE_STA=0;			         //开启下一次捕获
+ }				
+}
+void TIM3_IRQHandler(void)
+{ 		    		  			    
+ u16 tsr;
+ tsr=TIM3->SR;
+ if((TIM3CH3_CAPTURE_STA&0X80)==0)           //还未成功捕获	
+ {
+  if(tsr&0X01)                               //溢出
+  {	    
+   if(TIM3CH3_CAPTURE_STA&0X40)              //已经捕获到高电平了
+   {
+	if((TIM3CH3_CAPTURE_STA&0X3F)==0X3F)     //高电平太长了
+	{
+	 TIM3CH3_CAPTURE_STA|=0X80;              //标记成功捕获了一次
+	 TIM3CH3_CAPTURE_VAL=0XFFFF;
+	}
+	else 
+	{TIM3CH3_CAPTURE_STA++;}
+   }	 
+  }
+  if(tsr&0x08)                               //捕获3发生捕获事件
+  {	
+   if(TIM3CH3_CAPTURE_STA&0X40)		         //捕获到一个下降沿 		
+   {	  			
+	TIM3CH3_CAPTURE_STA|=0X80;		           
+//标记成功捕获到一次高电平脉宽
+	TIM3CH3_CAPTURE_VAL=TIM3->CCR3;	         //获取当前的捕获值.
+	TIM3->CCER&=~(1<<9);			         //CC1P=0 设置为上升沿捕获
+   }
+   else  								     //还未开始,第一次捕获上升沿
+   {
+	TIM3CH3_CAPTURE_STA=0;			         //清空
+	TIM3CH3_CAPTURE_VAL=0;
+	TIM3CH3_CAPTURE_STA|=0X40;		         //标记捕获到了上升沿
+	TIM3->CNT=0;					         //计数器清空
+	TIM3->CCER|=1<<9; 				         //CC1P=1 设置为下降沿捕获
+   }		    
+  }			     	    					   
+ }
+ TIM3->SR=0;                                 //清除中断标志位 	     
+}
+void Timer1_Init(u16 arr,u16 psc)  
+{  
+ RCC->APB2ENR|=1<<11;                       //TIM1时钟使能    
+ TIM1->ARR=arr;                             //设定计数器自动重装值   
+ TIM1->PSC=psc;                             //预分频器7200,得到10Khz的计数时钟
+ TIM1->DIER|=1<<0;                          //允许更新中断				
+ TIM1->DIER|=1<<6;                          //允许触发中断	   
+ TIM1->CR1|=0x01;                           //使能定时器
+ MY_NVIC_Init(1,3,TIM1_UP_IRQChannel,2);
+} 
+int TIM1_UP_IRQHandler(void)  
+{    
+ if(TIM1->SR&0X0001)                        //5ms定时中断
+ {TIM1->SR&=~(1<<0);}                       //清除定时器1中断标志位		                        
+ Read_Distane();     	
+ return 0;
+}
+void TIM2_IRQHandler(void)
+{ 		    		  			    
+ if(TIM2->SR&0X0001)                        //溢出中断
+ {
+  TimeOutCounter ++;
+  timer++;
+  switch(LeftOrRight)
+  {
+   case 0 :	                                //1.5ms
+   {
+    if(TimeOutCounter<=6)
+    {ControlPort = 1;}
+    else 
+    {ControlPort = 0;}
+   }break;
+   case 1 :                                 //1ms
+   {
+    if(TimeOutCounter<=4)
+    {ControlPort = 1;}
+    else 
+    {ControlPort = 0;}		
+   }break;
+   case 2 :                                 //2ms
+   {
+    if(TimeOutCounter<=8)
+    {ControlPort = 1;}
+    else 
+    {ControlPort = 0;}			
+   }break;
+   default : break;
+  }
+  if(TimeOutCounter <= 30)
+  {EN1 = 1;EN2 = 1;}
+  else if(TimeOutCounter > 30)
+  {EN1 = 0;EN2 = 0;}	
+  if(TimeOutCounter==80)	                    //20ms
+  {TimeOutCounter = 0;} 
+ }				   
+ TIM2->SR&=~(1<<0);                           //清除中断标志位 	    
+}
+void Timer2_Init(u16 arr,u16 psc)
+{
+ RCC->APB1ENR|=1<<0;                    //TIM2时钟使能    
+ TIM2->ARR=arr;                         //设定计数器自动重装值//刚好1ms    
+ TIM2->PSC=psc;                         //预分频器7200,得到10Khz的计数时钟
+ //这两个东东要同时设置才可以使用中断
+ TIM2->DIER|=1<<0;                      //允许更新中断				  
+ TIM2->CR1|=0x01;                       //使能定时器3
+ MY_NVIC_Init(1,3,TIM2_IRQChannel,2);   //抢占1，子优先级3，组2			
+} 
+小车的超声波避障运动主要依靠一下代码来实现：
+void process(void)                            //避障处理函数
+{
+ u8 j;
+ u8 p;	
+ u32 S1_temp = 0;
+ u32 S2_temp = 0; 	 
+ LeftOrRight    = Left;                       //舵机转到左边
+ TimeOutCounter = 0;
+ for(j=0;j<=9;j++)
+ {delay_ms(1000);}
+ Oled_Show();                                 //显示障碍物距离信息
+ S1_temp = JuLi;                              
+//小车左边障碍物距离存在变量S1_temp中 
+ LeftOrRight    = Right;                      //舵机转到右边
+ TimeOutCounter = 0;
+ for(j=0;j<=13;j++)
+ {delay_ms(1000);} 
+ Oled_Show();                                 //显示障碍物距离信息
+ S2_temp = JuLi; 	                            
+//小车右边障碍物距离存在变量S2_temp中	
+ LeftOrRight    = Stop;                       //舵机回到中间
+ TimeOutCounter = 0;
+ for(j=0;j<=9;j++)
+ {delay_ms(1000);}
+ if((S1_temp<=200)||(S2_temp<=200))           
+//如果超声波模块测得左边或右边障碍物的距离小于20厘米
+ {
+  back();		                              //小车后退
+  for(p=0;p<=10;p++)
+  {delay_ms(1000);}
+ }
+ else
+ {
+  back();		                                  //小车后退
+  for(p=0;p<=8;p++)
+  {delay_ms(1000);}   
+ }
+ stop();                                      //小车停下
+ for(p=0;p<=2;p++)
+ {delay_ms(1000);}  		   
+ if(S1_temp>S2_temp)		                  //如果左边障碍物离小车远
+ {
+  circle_left(); 	                          //小车向左转
+  for(p=0;p<=2;p++)
+  {delay_ms(1000);}
+ }				      
+ else if(S1_temp<S2_temp)                     //如果右边障碍物离小车远
+ {
+  circle_right();		                      //小车向右转
+  for(p=0;p<=2;p++)
+  {delay_ms(1000);}
+ }
+}
